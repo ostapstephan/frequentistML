@@ -2,15 +2,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
-
-#from tqdm import tqdm
-#from sklearn.cluster import MeanShift
-#from sklearn.cluster import KMeans
+from sklearn.linear_model import Lasso
+from sklearn import linear_model
 
 def mse(real,predict):
-	e = predict.flatten() - real.flatten()
-	e = float(np.sum(np.power(e,2))/len(real))
-	return e
+	return(np.mean((real.flatten()-predict.flatten()) **2))
 
 def genTrainAndVal(d): #split the features and labels of the training data 80:10:10 train, validation and test
 	z = d.shape[0]	
@@ -54,23 +50,21 @@ pred = np.matmul(testFeat, beta_hat)
 # Print the Mean squared error
 print("Test predictions: ", mse(testLab,pred))
 
-
-
-
 ###########################################
 ### 		  Ridge Regression 			###
 ###########################################
 
 dataBarsRR = dataBars.drop('bias',axis=1) #Drop the bias cuz its gonna be normalized 
-dataBarsRR = dataBarsRR.drop('MPG',axis=1)
 dataBarsLabRR = dataBars.MPG
-#print("A",dataBarsRR.columns)
+dataBarsRR = dataBarsRR.drop('MPG',axis=1)
+
 # Normalize Data
 dataBarsRRMean = dataBarsRR.mean(axis=0)
 dataBarsRR = (dataBarsRR-dataBarsRRMean)
 dataBarsRRMax = dataBarsRR.max(axis=0) 
 dataBarsRR = dataBarsRR/dataBarsRRMax
-#print("Shapes: ",dataBarsRRMean.shape,dataBarsRRMax.shape)
+
+#	print(dataBarsRR.head(),dataBarsRR.head())
 
 bias = dataBars.MPG.mean(axis=0)
 print("B",bias)
@@ -81,14 +75,14 @@ testrL,valrL,trainrL = genTrainAndVal(dataBarsLabRR)
 testFeat, valFeat, trainFeat = np.array(testrF),np.array(valrF),np.array(trainrF)
 testLab, valLab, trainLab = np.array(testrL),np.array(valrL),np.array(trainrL)
 
-n = 100000 #steps for the lambda optimization
-Lambda = np.linspace(0,1000-1/n,n)
+n = 100001 #steps for the lambda optimization
+Lambda = np.linspace(0,1,n)
 Identity = np.identity(trainFeat.shape[1])
-
-lf =np.inf
+lf = np.inf
 best = np.inf
-MSEa =[] 
+MSEa =[] #mean sq error analysis
 
+#find a good lambda
 for l in Lambda:
 	inve = np.linalg.inv(np.matmul(np.transpose(trainFeat),trainFeat) +l*Identity)
 	trflab = np.transpose(trainFeat) #transpose features times labels
@@ -99,29 +93,69 @@ for l in Lambda:
 	if (r < best):
 		best = r
 		lf = l 
-	
 
 fig1= plt.figure(1)
-
 MSEa=np.asarray(MSEa)
 MSEa=np.transpose(MSEa)
 print("msea,",MSEa.shape)
 plt.plot(MSEa[0],MSEa[1])
 
 print("lf: ", lf)
-plt.show()
-inve = np.linalg.inv(np.matmul(np.transpose(trainFeat),trainFeat) +lf*Identity)
+#plt.show()
+
+inve = np.linalg.inv(np.matmul(np.transpose(trainFeat),trainFeat) + lf*Identity)
 trflab = np.transpose(trainFeat) #transpose features times labels
 beta_hatR = np.matmul(np.matmul(inve,trflab),trainLab)
 pred = np.matmul(testFeat, beta_hatR)
 print("Test predictions: ", mse(testLab,pred))
 
-
-
 ###########################################
 ### 		  Lasso Regression 			###
 ###########################################
 
+n = 100001 #steps for the lambda optimization
+Lambda = np.linspace(0,1,n)
+Identity = np.identity(trainFeat.shape[1])
+lf = np.inf
+best = np.inf
+MSEa =[] #mean sq error analysis
 
+#testrF,valrF,trainrF 
+#testrL,valrL,trainrL
 
+#find a good lambda
+for l in Lambda:
+	lasso = Lasso(alpha=l, max_iter=10e5, normalize=True)
+	lasso.fit(trainrF,trainrL)
+	pred = lasso.predict(valrF)
+	
+	valError = mse(np.array(valrL),pred) 
+	coeffUsed = np.sum(lasso.coef_!=0)
+	
+	temp = valError
+	if temp < best:
+		best = temp
+		lf = l
+		coeffSaved = coeffUsed
+	
+lasso = Lasso(alpha=lf, max_iter=10e5, normalize=True)
+lasso.fit(trainrF,trainrL)
+testPred = lasso.predict(testrF)
+testError = mse(np.array(testrL),testPred)
 
+print("Ideal lambda:", lf)
+print("Test Error ", testError)
+print("Features used:",coeffSaved )
+
+alphas, coefs, _ = linear_model.lasso_path(testrF, testrL, eps=5e-5)
+fig, ax = plt.subplots(figsize=[15,10])
+negLogAlphas = -np.log10(alphas)
+for coef in coefs:
+	ax.plot(negLogAlphas, coef.T)
+
+ax.axvline(x=-np.log10(coeffSaved), linestyle="--")
+plt.xlabel("-log alpha")
+plt.ylabel("coefficients")
+plt.title("lasso paths")
+#plt.axis('tight')
+plt.show()
