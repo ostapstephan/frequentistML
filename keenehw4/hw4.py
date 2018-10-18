@@ -50,8 +50,8 @@ for t in range(10):
 		trainLab,  testLab =  selectedLab[trainIndex],  selectedLab[testIndex]
 		model.fit(trainFeat, trainLab)
 		error.append(1-model.score(testFeat,testLab))
-print(error)
-print(np.mean(error))
+print("Test Error the Wrong Way: ",np.mean(error))
+#print(np.mean(error))
 
 
 
@@ -78,8 +78,8 @@ for t in range(10):
 		model.fit(f[:,max100], l)
 		e.append(1-model.score(ft[:,max100],lt))
 
-print(e)
-print(np.mean(e))
+#print(e)
+print("Test Error The correct Way: ", np.mean(e))
 
 
 
