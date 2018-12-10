@@ -146,7 +146,7 @@ dtrain = xgb.DMatrix(X_train, label=y_train)
 dval = xgb.DMatrix(X_val, label=y_val)
 
 #setup parameters
-param = {'max_depth': 7,'nthread':4 , 'eta': .3, 'silent': 0,'tree_method':'gpu_hist', 'objective': 'reg:linear', 'eval_metric':'rmse'}
+param = {'max_depth': 10,'nthread':4 , 'eta': .05, 'silent': 0,'tree_method':'gpu_hist', 'objective': 'reg:linear', 'eval_metric':'rmse'}
 evallist = [(dtest, 'eval'), (dval, 'train')]
 
 '''
@@ -155,7 +155,7 @@ alpha [default=0]  L1 regularization term on weights. Increasing this value will
 '''
 
 #training
-num_round = 10
+num_round = 100
 bst = xgb.train(param, dtrain, num_round, evallist)
 
 #saving a model post training
