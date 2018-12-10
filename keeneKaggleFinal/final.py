@@ -131,17 +131,16 @@ test_X  = testDataClean.values
 train_y = trainDataClean.Labels.values 
 
 X_train, X_val, y_train, y_val = train_test_split(train_X, train_y, test_size=0.1)
-
-
-
+print(type(X_train))
 # You can experiment with many other options here, using the same .fit() and .predict()
 gbm = xgb.XGBClassifier(max_depth=3, n_estimators=10, learning_rate=0.05).fit(X_train, y_train)# ,silent=False
 predictions = gbm.predict(X_val)
 print(type(predictions))
 err = np.sqrt(np.mean(np.square(np.subtract( y_val, predictions))))
-
 print(err)
-# = y_val-predictions
+
+
+
 
 # Kaggle needs the submission to have a certain format
 '''
