@@ -27,6 +27,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import VarianceThreshold
 
 import xgboost as xgb
 
@@ -150,6 +152,11 @@ for n in categoricalData: # Process the categorical data into one Hot vectors
 def normalizeMyData(trainDataClean,testDataClean):
 	#stack data first
 	lab = pd.DataFrame(trainDataClean.Labels.values, columns=['Labels'])
+	
+	def myPCA(X,n=10):
+		ipca = PCA(n_components=n)
+		ipca.fit(X)
+		return ipca.transform(X)
 
 	print("Label shape: ",lab.shape)
 	z = [trainDataClean.drop('Labels',axis=1),testDataClean]
@@ -161,18 +168,37 @@ def normalizeMyData(trainDataClean,testDataClean):
 	col = z.columns
 	print('col shape',col.shape)
 	x_stack = z.values #returns a numpy array
-	min_max_scaler = preprocessing.MinMaxScaler()
+	min_max_scaler = preprocessing.MinMaxScaler()#normalizes via min and max
 	x_scaled = min_max_scaler.fit_transform(x_stack)
-	z = pd.DataFrame(x_scaled, columns=col)
+	if False: #Toggle whether you want to run pca
+		xpca = myPCA(x_scaled)
+		z = pd.DataFrame(xpca)
+	else:#do the normal thing
+		z = pd.DataFrame(x_scaled, columns=col)
+
+	#Perform Variance thresholding
+	if True: 
+		sel = VarianceThreshold(threshold=(.1))
+		fitdata = sel.fit(z)
+		drp = []
+		for k in range(len(fitdata.variances_)):
+			if fitdata.variances_[k] <0.01:
+				drp.append(z.columns[k])
+
+		print("weqweqwe",drp)				
+		z= z.drop(drp,1)
+		print(z.shape)
+
 	print("z shape",z.shape)
-	#print("debug",z[5445:5450],'\n',lab[5445:5450])
 	trainDataClean = pd.concat((z[:i],lab),1)
+	testDataClean = z[i:]
 	print("trainDataClean shape",trainDataClean.shape)
 	print('TD Shape Post norm:',trainDataClean.shape,testDataClean.shape)
 	return trainDataClean,testDataClean
 
 if True: #normalize Data
 	trainDataClean,testDataClean = normalizeMyData(trainDataClean,testDataClean)
+
 
 
 # Prepare the inputs for the model
@@ -211,7 +237,6 @@ def Lasso():
 	def rmse(y_pred, y_true):
 		return np.sqrt(np.mean(np.square(y_pred - y_true), axis=-1))
 
-	
 	print('Press enter to train a linear_model w Lasso')
 	_ = input()
 
@@ -266,12 +291,10 @@ def RunXgboost():
 	num_round = 1000
 	bst = xgb.train(param, dtrain, num_round, evallist)
 
-
 	# Prediction
 	ypred = bst.predict(dtest)
 	print('press enter to save output to csv')
 	i = input()
-
 
 	#### Outputing predictions to csv ####
 
@@ -291,7 +314,7 @@ def RunXgboost():
 	#bst = xgb.Booster({'nthread': 4})  # init model
 	#bst.load_model('model.bin')  # load data
 
-#RunXgboost()
+RunXgboost()
 
 
 
@@ -370,3 +393,37 @@ if False:
 		plt.scatter(a,b,color = 'Black')
 		pylab.savefig( 'graphs/clean/' + str(a.name) + '.png')
 		plt.cla()
+########################################################333
+# use feature importance for feature selection
+
+from sklearn.feature_selection import SelectFromModel
+# load data
+dataset = loadtxt('pima-indians-diabetes.csv', delimiter=",")
+# split data into X and y
+X = dataset[:,0:8]
+Y = dataset[:,8]
+# split data into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.33, random_state=7)
+# fit model on all training data
+model = XGBClassifier()
+model.fit(X_train, y_train)
+# make predictions for test data and evaluate
+y_pred = model.predict(X_test)
+predictions = [round(value) for value in y_pred]
+accuracy = accuracy_score(y_test, predictions)
+print("Accuracy: %.2f%%" % (accuracy * 100.0))
+# Fit model using each importance as a threshold
+thresholds = sort(model.feature_importances_)
+for thresh in thresholds:
+	# select features using threshold
+	selection = SelectFromModel(model, threshold=thresh, prefit=True)
+	select_X_train = selection.transform(X_train)
+	# train model
+	selection_model = XGBClassifier()
+	selection_model.fit(select_X_train, y_train)
+	# eval model
+	select_X_test = selection.transform(X_test)
+	y_pred = selection_model.predict(select_X_test)
+	predictions = [round(value) for value in y_pred]
+	accuracy = accuracy_score(y_test, predictions)
+	print("Thresh=%.3f, n=%d, Accuracy: %.2f%%" % (thresh, select_X_train.shape[1], accuracy*100.0))
