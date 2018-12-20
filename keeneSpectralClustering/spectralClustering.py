@@ -1,12 +1,19 @@
 #!/bin/python3.6
 #Ostap Voynarovskiy
-#Uns
-#Sept 19 2018
-#Professor Curro
+#Frequentist Machine Learning 
+#Dec 17 2018
+#Professor Keene
+
+### This is an implemeentation of Spectral clustering 
+### as shown described in the following paper:
+### https://ai.stanford.edu/~ang/papers/nips01-spectral.pdf
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
+from sklearn.cluster import KMeans
+from scipy.linalg import eigh as largest_eigh
+
 
 BATCH_SIZE = 200
 NUM_ITER = 4000# iterations of training 
@@ -14,16 +21,14 @@ NUM_ITER = 4000# iterations of training
 class Data(object):
 	def __init__(self):
 		#create spirals
-		nPoints = 200 
-		self.index = np.arange(nPoints)
-		self.nPoints = nPoints
-		self.featx, self.featy, self.lab  = self.gen_spiral(nPoints)
+		i=0
+		#actually nothing needs to happen here
 
-	def gen_spiral(self,nPoints):
+	def genSpiral(self,nPoints):
 		scale = 1
 		offset = 1
 		sigma = .2
-
+		
 		t = np.linspace(0,3.5*np.pi,num = nPoints)
 		noise0 = sigma*np.random.normal(size=nPoints)
 		noise1 = sigma*np.random.normal(size=nPoints)
@@ -43,58 +48,144 @@ class Data(object):
 		self.x1 = np.cos(theta1)*(r1) 
 		self.y1 = np.sin(theta1)*(r1)
 		cat1 = [1]*nPoints 			# the categories
-		return np.concatenate((self.x0,self.x1)),np.concatenate((self.y0,self.y1)), np.concatenate((cat0,cat1)) 		
+		return np.concatenate((self.x0,self.x1)),np.concatenate((self.y0,self.y1)) #, np.concatenate((cat0,cat1)) 		
 	
 	def genCircles(self,nPoints):
-		return True
+		scale = 1
+		offset = 1
+		sigma = .1
+		#np.random.seed(1)
+		t = np.linspace(0,3.5*np.pi,num = nPoints)
+		noise0 = sigma*np.random.normal(size=nPoints)
+		noise1 = sigma*np.random.normal(size=nPoints)
+		noise2 = sigma*np.random.normal(size=nPoints)
+		noise3 = sigma*np.random.normal(size=nPoints)
+		noise4 = sigma*np.random.normal(size=nPoints)
+		noise5 = sigma*np.random.normal(size=nPoints)
+		
 
-	def secondGaussian(self,nPoints):
+
+		#add normal noise
+		theta0 = -t*scale + noise0
+		r0 = ( offset) + noise1
+		theta1= -t*scale + np.pi + noise2	#the addition of pi does a 180 degree shift
+		r1 = (2*offset) + noise3
+		theta2 = -t*scale + np.pi + noise4	#the addition of pi does a 180 degree shift
+		r2 = (3*offset) + noise5
+
+		#convert from polar to cartesian
+		self.x0 = np.cos(theta0)*(r0)
+		self.y0 = np.sin(theta0)*(r0)
+		cat0 = [0]*nPoints 			# the categories
+		self.x1 = np.cos(theta1)*(r1) 
+		self.y1 = np.sin(theta1)*(r1)
+		cat1 = [1]*nPoints 			# the categories
+		self.x2 = np.cos(theta2)*(r2) 
+		self.y2 = np.sin(theta2)*(r2)
+		cat2 = [2]*nPoints 			# the categories
+
+		a = np.concatenate((self.x0,self.x1,self.x2)) 
+		b = np.concatenate((self.y0,self.y1,self.y2)) 
+		return a, b #, np.concatenate((cat0,cat1)) 		
+
+
+	def twoDimentionalGaussian(self,nPoints):
 		return True
 
 	def kmeansClusterWithOOB(self):
 		return True
 
 
-def spectralCluster(self,pointSet,k):
-	# Step 1
-	sigma = 3#tuning param
-	a = np.zeros(len(pointSet),len(pointSet))
+
+
+def spectralCluster(s,k):
+	pointSet = np.asarray(list(zip(s[0],s[1])))
+	n = len(pointSet)
+	### Step 1 ###
+	sigma = .12 #tuning param sweep over this param to find the val
+
+	# Generate a, the Affinity matrix
+	a = np.zeros((len(pointSet),len(pointSet)) )
 	for i in range(len(pointSet)):
 		for j in range(len(pointSet)):
-			a[i][j] = np.linalg.norm(np.subtract(pointSet[i],pointSet[j]))
-
-	a = np.divide(-1*np.power(a),2*sigma**2)
-
-	# Step 2
-	#define d
-
+			a[i][j] = np.power(np.linalg.norm(np.subtract(pointSet[i],pointSet[j])),2)
+	a = np.exp(np.divide(np.multiply(a,-1), 2*sigma**2 ))	
+	#make diag of 0
 	for i in range(len(pointSet)):
-
-	for 
+		a[i][i] = 0
 	
+	### Step 2 ###
+	# define d a diag matrix of sum of a's rows
+	d = np.zeros((len(pointSet),len(pointSet)))
+	for i in range(len(pointSet)):
+		d[i][i]= np.sum(a[i]) #sum of rows of a
+	
+	# define L (eq given in the paper)
+	da = np.matmul(np.power( np.linalg.inv(d) , 0.5 ),a)
+	L  = np.matmul(da, np.power(np.linalg.inv(d),0.5)) #np.linalg.inv(d)
+	
+	### Step 3 ####
+	# find the k biggest eigenvalues and vectors
+	w, x = largest_eigh(L, eigvals=(n-k,n-1)) #gives largest k eigenvals
 
-	return data
+	### step 4 ###
+	#create y matrix (x normalized )
+	y = np.zeros((len(pointSet),len(pointSet)))
+	norms = np.linalg.norm(x,axis=1) #find norm of each row
+	y = x/norms[:,None] #divide each row by its norm 
+	
+	### step 5 ### 
+	# Perform clustering on the y matrix
+	kmeans = KMeans(n_clusters=k,max_iter=3000).fit(y)
+	lab = np.expand_dims(np.asarray(kmeans.labels_),1)
+	
+	### step 6 ###
+	#assign the elements to the proper cluster 
+	labeledPoints = np.append(pointSet,lab,axis=1)
+	points = labeledPoints[labeledPoints[:,2].argsort()]
+	split = np.bincount(points[:,2].astype(int))
 
+	i = 0 
+	k = 0
+	plot = []
+	for j in split:
+		k += j
+		plot.append(points[i:k])
+		#print("splits",i,k)
+		i = k
+
+	return plot , y 
+
+
+data = Data()
+d = data.genSpiral(200)
+numClusters = 2
+plot ,y = spectralCluster(d,numClusters)
+
+
+# Plotting
 fig1= plt.figure(1)
+for i in range(len(plot)):
+	print(plot[i].T[1].shape)
+	plt.scatter(plot[i].T[0], plot[i].T[1])  #, color = col[i]
 
-xc,yc = np.linspace(-15,15,500),np.linspace(-15,15,500) 
-xv,yv = np.meshgrid(xc,yc)
-
-feat = np.array(list(zip(xv.flatten(),yv.flatten())))
-
-plt.contourf(xv,yv,cont.reshape((500,500)),[0,.5,1])
-plt.scatter(data.x0,data.y0,color='white')
-plt.scatter(data.x1,data.y1,color='black')
-
+plt.title("Clustered Data")
 w= plt.xlabel('x')
+w.set_rotation(0)
 h= plt.ylabel('y')
 h.set_rotation(0)
-w.set_rotation(0)
+plt.axis('equal')	
 
 
 
+# Plot the Y Matrix
+fig2 =plt.figure(2)
+y = y.T #transpose to plot
+plt.scatter(y[0],y[1],color='green')
 
-plt.axis('equal') #make it so that it isnt warped
+plt.title('Y Matrix Plot')
+#no axis labels cuz im not sure what theyre supposed to be
+plt.axis('equal')
+
+
 plt.show()
-
-
