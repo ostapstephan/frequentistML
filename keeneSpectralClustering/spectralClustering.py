@@ -14,22 +14,19 @@ import matplotlib.mlab as mlab
 from sklearn.cluster import KMeans
 from scipy.linalg import eigh as largest_eigh
 
-
-BATCH_SIZE = 200
-NUM_ITER = 4000# iterations of training 
-
 class Data(object):
 	def __init__(self):
-		#create spirals
+		
 		i=0
 		#actually nothing needs to happen here
 
 	def genSpiral(self,nPoints):
 		scale = 1
 		offset = 1
-		sigma = .2
-		
-		t = np.linspace(0,3.5*np.pi,num = nPoints)
+		sigma = .1
+		numSpirals = 2
+
+		t = np.linspace(0,numSpirals*np.pi,num = nPoints)
 		noise0 = sigma*np.random.normal(size=nPoints)
 		noise1 = sigma*np.random.normal(size=nPoints)
 		noise2 = sigma*np.random.normal(size=nPoints)
@@ -62,10 +59,8 @@ class Data(object):
 		noise3 = sigma*np.random.normal(size=nPoints)
 		noise4 = sigma*np.random.normal(size=nPoints)
 		noise5 = sigma*np.random.normal(size=nPoints)
-		
 
-
-		#add normal noise
+		# Add Gaussian noise
 		theta0 = -t*scale + noise0
 		r0 = ( offset) + noise1
 		theta1= -t*scale + np.pi + noise2	#the addition of pi does a 180 degree shift
@@ -90,20 +85,23 @@ class Data(object):
 
 
 	def twoDimentionalGaussian(self,nPoints):
-		return True
+		sig = .5
+		self.x0 = np.random.normal(1,sig, size=nPoints)
+		self.y0 = np.random.normal(1,sig, size=nPoints)
+		
+		self.x1 = np.random.normal(-1,sig, size=nPoints)
+		self.y1 = np.random.normal(-1,sig, size=nPoints)
+		
+		return np.concatenate((self.x0,self.x1)),np.concatenate((self.y0,self.y1)) 
 
-	def kmeansClusterWithOOB(self):
-		return True
 
-
-
-
-def spectralCluster(s,k):
+def spectralCluster(s,k, sigma= .12):
+	
 	pointSet = np.asarray(list(zip(s[0],s[1])))
 	n = len(pointSet)
+	#sigma tuning param sweep over this param to find the val
+	
 	### Step 1 ###
-	sigma = .12 #tuning param sweep over this param to find the val
-
 	# Generate a, the Affinity matrix
 	a = np.zeros((len(pointSet),len(pointSet)) )
 	for i in range(len(pointSet)):
@@ -148,20 +146,22 @@ def spectralCluster(s,k):
 	i = 0 
 	k = 0
 	plot = []
-	for j in split:
+	for j in split: #split for plotting
 		k += j
 		plot.append(points[i:k])
-		#print("splits",i,k)
 		i = k
 
-	return plot , y 
+	return plot , y #k arrays of items belonging to their cluster and the ymatrix
 
 
 data = Data()
-d = data.genSpiral(200)
-numClusters = 2
-plot ,y = spectralCluster(d,numClusters)
+#d = data.genSpiral(200)
+d = data.genCircles(200)
+#d = data.twoDimentionalGaussian(200)
 
+#chage to 2 if youre using the spiral or gaussian
+numClusters = 3
+plot, y = spectralCluster(d,numClusters)
 
 # Plotting
 fig1= plt.figure(1)
@@ -169,13 +169,12 @@ for i in range(len(plot)):
 	print(plot[i].T[1].shape)
 	plt.scatter(plot[i].T[0], plot[i].T[1])  #, color = col[i]
 
-plt.title("Clustered Data")
+plt.title("Clustered Data: Circles")
 w= plt.xlabel('x')
 w.set_rotation(0)
 h= plt.ylabel('y')
 h.set_rotation(0)
-plt.axis('equal')	
-
+plt.axis('equal')
 
 
 # Plot the Y Matrix
@@ -183,7 +182,7 @@ fig2 =plt.figure(2)
 y = y.T #transpose to plot
 plt.scatter(y[0],y[1],color='green')
 
-plt.title('Y Matrix Plot')
+plt.title('Y Matrix Plot: Circles')
 #no axis labels cuz im not sure what theyre supposed to be
 plt.axis('equal')
 
